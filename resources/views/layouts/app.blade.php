@@ -56,7 +56,10 @@
                             </li>
                             @if(Auth::user()->is_admin)
                                 <li class="nav-item">
-                                    <a class="nav-link" href="{{ route('admin.parties.index') }}">Admin</a>
+                                    <a class="nav-link" href="{{ route('admin.parties.index') }}">Parties</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" href="{{ route('admin.users.index') }}">Users</a>
                                 </li>
                             @endif
                         @endauth

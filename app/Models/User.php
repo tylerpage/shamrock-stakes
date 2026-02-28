@@ -22,6 +22,7 @@ class User extends Authenticatable
         'email',
         'password',
         'is_admin',
+        'blocked_at',
     ];
 
     /**
@@ -42,7 +43,13 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
         'is_admin' => 'boolean',
+        'blocked_at' => 'datetime',
     ];
+
+    public function isBlocked(): bool
+    {
+        return $this->blocked_at !== null;
+    }
 
     public function parties(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
     {

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\PartyController as AdminPartyController;
+use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\PartyController;
 use Illuminate\Support\Facades\Route;
 
@@ -18,7 +19,7 @@ Auth::routes();
 
 Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
 
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', 'not_blocked'])->group(function () {
     Route::get('/parties', [PartyController::class, 'index'])->name('parties.index');
     Route::get('/parties/{party}', [PartyController::class, 'show'])->name('parties.show');
     Route::get('/parties/{party}/markets/{market}/bets', [PartyController::class, 'marketBets'])->name('parties.markets.bets');
@@ -30,6 +31,14 @@ Route::middleware('auth')->group(function () {
     Route::post('/push-subscription', [App\Http\Controllers\PushSubscriptionController::class, 'store'])->name('push.subscribe');
 
     Route::prefix('admin')->middleware('admin')->name('admin.')->group(function () {
+        Route::get('/users', [AdminUserController::class, 'index'])->name('users.index');
+        Route::get('/users/create', [AdminUserController::class, 'create'])->name('users.create');
+        Route::post('/users', [AdminUserController::class, 'store'])->name('users.store');
+        Route::get('/users/{user}/edit', [AdminUserController::class, 'edit'])->name('users.edit');
+        Route::put('/users/{user}', [AdminUserController::class, 'update'])->name('users.update');
+        Route::post('/users/{user}/block', [AdminUserController::class, 'block'])->name('users.block');
+        Route::post('/users/{user}/unblock', [AdminUserController::class, 'unblock'])->name('users.unblock');
+
         Route::get('/parties', [AdminPartyController::class, 'index'])->name('parties.index');
         Route::get('/parties/create', [AdminPartyController::class, 'create'])->name('parties.create');
         Route::post('/parties', [AdminPartyController::class, 'store'])->name('parties.store');
