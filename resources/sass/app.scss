@@ -1,0 +1,64 @@
+// Fonts
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;600;700&display=swap');
+
+// Variables
+@import 'variables';
+
+// Bootstrap
+@import '~bootstrap/scss/bootstrap';
+
+// Irish bold branding
+$shamrock-green: #0d3328;
+$shamrock-green-light: #1a4d3e;
+$shamrock-gold: #c9a227;
+$shamrock-gold-light: #e8c547;
+$shamrock-cream: #f5f0e6;
+
+.shamrock-body { font-family: 'DM Sans', sans-serif; background: $shamrock-cream; }
+.shamrock-nav { background: $shamrock-green !important; }
+.shamrock-brand { font-family: 'Bebas Neue', sans-serif; font-size: 1.6rem; letter-spacing: 0.05em; color: $shamrock-gold-light !important; }
+.navbar-dark .navbar-nav .nav-link { color: rgba(255,255,255,0.9) !important; }
+.navbar-dark .navbar-nav .nav-link:hover { color: $shamrock-gold-light !important; }
+.card.shamrock-card { border: 2px solid $shamrock-green; border-radius: 12px; }
+.card-header.shamrock-header { background: $shamrock-green; color: $shamrock-gold-light; font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; letter-spacing: 0.05em; }
+.btn-shamrock { background: $shamrock-green; color: $shamrock-gold-light; border: none; font-weight: 700; }
+.btn-shamrock:hover { background: $shamrock-green-light; color: #fff; }
+.badge-shamrock { background: $shamrock-gold; color: $shamrock-green; }
+.odds-bar { height: 8px; border-radius: 4px; background: #dee2e6; overflow: hidden; }
+.odds-fill { height: 100%; border-radius: 4px; background: $shamrock-green; }
+
+// Mobile-friendly touch targets (min 44px)
+@media (max-width: 767.98px) {
+  .btn,
+  .navbar .nav-link,
+  .dropdown-item {
+    min-height: 44px;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .btn-sm { min-height: 44px; padding: 0.6rem 1rem; font-size: 1rem; }
+  .navbar .nav-link { padding-left: 1rem; padding-right: 1rem; }
+  .dropdown-item { padding: 0.75rem 1.25rem; font-size: 1rem; }
+  .input-group .form-control,
+  .form-control {
+    min-height: 44px;
+    font-size: 16px; // prevents zoom on focus in iOS
+  }
+  .input-group-sm .form-control,
+  .input-group .form-control.input-group-sm { min-height: 44px; padding: 0.6rem 0.75rem; font-size: 16px; }
+  .input-group .btn,
+  .input-group-sm .btn,
+  .bet-input-group .btn { min-height: 44px; padding: 0.6rem 1rem; font-size: 1rem; }
+  .bet-input-group .form-control { min-height: 44px; padding: 0.6rem 0.75rem; font-size: 16px; }
+  .navbar-toggler { padding: 0.6rem 0.75rem; min-width: 44px; min-height: 44px; }
+  .card-body .btn,
+  .card-body .input-group .btn { min-height: 48px; padding: 0.75rem 1.25rem; font-size: 1.05rem; }
+  main { padding-bottom: 2rem; }
+  .container { padding-left: 0.75rem; padding-right: 0.75rem; }
+  .btn-touch { min-height: 44px; padding: 0.65rem 1.1rem !important; font-size: 1rem; }
+  .form-select { min-height: 44px; font-size: 16px; padding: 0.6rem 2rem 0.6rem 0.75rem; }
+  .card-body .form-control { min-height: 44px; font-size: 16px; }
+}
