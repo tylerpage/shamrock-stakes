@@ -10,6 +10,7 @@ use App\Models\Market;
 use App\Models\MarketOption;
 use App\Models\MarketResolution;
 use App\Models\Party;
+use App\Models\PartyInvitation;
 use App\Models\PartyUser;
 use App\Models\User;
 use App\Services\PushNotificationService;
@@ -60,7 +61,7 @@ class PartyController extends Controller
     public function show(Party $party)
     {
         $this->authorize('update', $party);
-        $party->load(['markets.options', 'markets.resolution.winningOption', 'members.user']);
+        $party->load(['markets.options', 'markets.resolution.winningOption', 'members.user', 'partyInvitations']);
         return view('admin.parties.show', compact('party'));
     }
 
@@ -68,23 +69,30 @@ class PartyController extends Controller
     {
         $this->authorize('update', $party);
         $request->validate([
-            'email' => [
-                'required',
-                'email',
-                'exists:users,email',
-            ],
-        ], [
-            'email.exists' => 'No account exists with this email. The person must register first, then you can invite them.',
+            'email' => ['required', 'email'],
         ]);
-        $user = User::where('email', $request->email)->first();
-        if ($party->users()->where('user_id', $user->id)->exists()) {
-            return back()->withErrors(['email' => 'User already in party.']);
+        $email = strtolower($request->email);
+
+        $user = User::where('email', $email)->first();
+        if ($user) {
+            if ($party->users()->where('user_id', $user->id)->exists()) {
+                return back()->withErrors(['email' => 'That user is already in the party.']);
+            }
+            $party->users()->attach($user->id, [
+                'balance' => $party->default_balance,
+                'invited_at' => now(),
+            ]);
+            return back()->with('success', 'Invited ' . $user->name . '. They can open the party from My Parties.');
         }
-        $party->users()->attach($user->id, [
-            'balance' => $party->default_balance,
+
+        if ($party->partyInvitations()->where('email', $email)->exists()) {
+            return back()->with('success', 'That email is already invited. They’ll see the party when they register with this address.');
+        }
+        $party->partyInvitations()->create([
+            'email' => $email,
             'invited_at' => now(),
         ]);
-        return back()->with('success', 'Invited ' . $user->name);
+        return back()->with('success', 'Invitation sent. When they register with ' . $email . ', they’ll see this party on My Parties.');
     }
 
     public function updateBalance(Request $request, Party $party)

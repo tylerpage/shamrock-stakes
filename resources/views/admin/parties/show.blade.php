@@ -34,10 +34,11 @@
     <div class="card shamrock-card mb-4">
         <div class="card-header shamrock-header">Invite & balances</div>
         <div class="card-body">
+            <p class="small text-muted mb-2">Invite by email. If they already have an account, they’re added now. If not, they’ll see this party when they register with that email.</p>
             <form method="POST" action="{{ route('admin.parties.invite', $party) }}" class="row g-2 mb-3">
                 @csrf
                 <div class="col-auto">
-                    <label for="email" class="col-form-label">Invite by email</label>
+                    <label for="email" class="col-form-label">Email</label>
                 </div>
                 <div class="col-md-4">
                     <input type="email" class="form-control @error('email') is-invalid @enderror" id="email" name="email" placeholder="user@example.com" value="{{ old('email') }}">
@@ -45,6 +46,14 @@
                 </div>
                 <div class="col-auto"><button type="submit" class="btn btn-shamrock">Invite</button></div>
             </form>
+            @if($party->partyInvitations->isNotEmpty())
+                <p class="small mb-1"><strong>Pending</strong> (will join when they register with this email):</p>
+                <ul class="small text-muted mb-3">
+                    @foreach($party->partyInvitations as $inv)
+                        <li>{{ $inv->email }}</li>
+                    @endforeach
+                </ul>
+            @endif
             <table class="table table-sm">
                 <thead><tr><th>User</th><th>Balance</th><th>Action</th></tr></thead>
                 <tbody>

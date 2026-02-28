@@ -48,6 +48,11 @@ class Party extends Model
         return $this->hasMany(Market::class)->orderBy('created_at');
     }
 
+    public function partyInvitations(): HasMany
+    {
+        return $this->hasMany(PartyInvitation::class)->orderBy('invited_at', 'desc');
+    }
+
     /** Leaderboard rows: available, portfolio, change_pct (from default_balance), sorted by portfolio desc. */
     public function getLeaderboardMembers(): \Illuminate\Support\Collection
     {
