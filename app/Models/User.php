@@ -79,6 +79,7 @@ class User extends Authenticatable
             return $available;
         }
         $openBets = \App\Models\Bet::where('user_id', $this->id)
+            ->whereNull('forfeited_at')
             ->whereIn('market_id', $liveMarketIds)
             ->with(['market' => fn ($q) => $q->with(['options', 'bets', 'preVotes'])])
             ->get();

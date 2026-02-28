@@ -12,6 +12,7 @@ use App\Models\MarketResolution;
 use App\Models\Party;
 use App\Models\PartyInvitation;
 use App\Models\PartyUser;
+use App\Models\ResolutionProposal;
 use App\Models\User;
 use App\Services\PushNotificationService;
 use Illuminate\Http\Request;
@@ -61,7 +62,10 @@ class PartyController extends Controller
     public function show(Party $party)
     {
         $this->authorize('update', $party);
-        $party->load(['markets.options', 'markets.resolution.winningOption', 'members.user', 'partyInvitations']);
+        $party->load([
+            'markets.options', 'markets.resolution.winningOption', 'members.user', 'partyInvitations',
+            'markets.pendingResolutionProposal.user', 'markets.pendingResolutionProposal.winningOption', 'markets.pendingResolutionProposal.photos',
+        ]);
         return view('admin.parties.show', compact('party'));
     }
 
@@ -288,7 +292,7 @@ class PartyController extends Controller
 
             $allBets = $market->bets()->get();
             $pool = $allBets->sum(fn ($b) => (float) $b->amount * (float) $b->price);
-            $winningBets = $allBets->where('market_option_id', $winningOptionId);
+            $winningBets = $allBets->where('market_option_id', $winningOptionId)->whereNull('forfeited_at');
             $totalWinningAmount = $winningBets->sum('amount');
 
             if ($totalWinningAmount > 0 && $pool > 0) {
@@ -322,5 +326,53 @@ class PartyController extends Controller
         // Notify party page so Active/Resolved tabs and counts can refresh
         broadcast(new PartyMarketsUpdated($market->party))->toOthers();
         broadcast(new PartyLeaderboardUpdated($market->party))->toOthers();
+    }
+
+    public function acceptResolutionProposal(Party $party, ResolutionProposal $proposal)
+    {
+        $this->authorize('update', $party);
+        if ($proposal->market->party_id !== $party->id || !$proposal->isPending()) {
+            abort(404);
+        }
+        $market = $proposal->market;
+
+        $proposal->update([
+            'status' => ResolutionProposal::STATUS_ACCEPTED,
+            'reviewed_by' => auth()->id(),
+            'reviewed_at' => now(),
+        ]);
+        $this->resolveMarket($market, $proposal->winning_option_id, 'proposed');
+
+        return back()->with('success', 'Resolution accepted. Market resolved.');
+    }
+
+    public function denyResolutionProposal(Request $request, Party $party, ResolutionProposal $proposal)
+    {
+        $this->authorize('update', $party);
+        if ($proposal->market->party_id !== $party->id || !$proposal->isPending()) {
+            abort(404);
+        }
+        $request->validate([
+            'denial_reason' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        DB::transaction(function () use ($proposal, $request) {
+            $proposal->market->bets()->where('user_id', $proposal->user_id)->update(['forfeited_at' => now()]);
+            $proposal->market->update(['status' => Market::STATUS_LIVE]);
+            $proposal->update([
+                'status' => ResolutionProposal::STATUS_DENIED,
+                'reviewed_by' => auth()->id(),
+                'reviewed_at' => now(),
+                'denial_reason' => $request->denial_reason,
+            ]);
+        });
+
+        $market = $proposal->market;
+        $market->load(['options', 'preVotes', 'bets', 'resolution']);
+        broadcast(new MarketOddsUpdated($market))->toOthers();
+        broadcast(new PartyMarketsUpdated($market->party))->toOthers();
+        broadcast(new PartyLeaderboardUpdated($market->party))->toOthers();
+
+        return back()->with('success', 'Resolution denied. Proposer’s position has been forfeited. Market is live again.');
     }
 }

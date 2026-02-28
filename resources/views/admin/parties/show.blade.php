@@ -76,6 +76,43 @@
         </div>
     </div>
 
+    @php $pendingProposals = $party->markets->flatMap(fn ($m) => $m->pendingResolutionProposal ? [$m->pendingResolutionProposal] : []); @endphp
+    @if($pendingProposals->isNotEmpty())
+    <div class="card shamrock-card mb-4 border-warning">
+        <div class="card-header shamrock-header d-flex justify-content-between align-items-center">
+            <span>Pending resolution proposals ({{ $pendingProposals->count() }})</span>
+        </div>
+        <div class="card-body">
+            <p class="small text-muted mb-3">A user proposed an outcome for these markets. Accept to resolve with that outcome, or deny to forfeit the proposer’s position and resume the market.</p>
+            @foreach($pendingProposals as $proposal)
+                <div class="border rounded p-3 mb-3" style="border-color: #0d3328 !important;">
+                    <strong>{{ $proposal->market->title }}</strong>
+                    <p class="mb-1 small"><strong>Proposed by:</strong> {{ $proposal->user->name }} · <strong>Winning outcome:</strong> {{ $proposal->winningOption->label ?? '—' }}</p>
+                    <p class="mb-2">{{ $proposal->description }}</p>
+                    @if($proposal->photos->isNotEmpty())
+                        <div class="d-flex flex-wrap gap-2 mb-2">
+                            @foreach($proposal->photos as $photo)
+                                <a href="{{ $photo->url() }}" target="_blank" rel="noopener"><img src="{{ $photo->url() }}" alt="Proposal photo" class="rounded" style="max-height:120px; max-width:200px; object-fit:cover;"></a>
+                            @endforeach
+                        </div>
+                    @endif
+                    <div class="d-flex flex-wrap gap-2 align-items-end">
+                        <form method="POST" action="{{ route('admin.resolution-proposals.accept', [$party, $proposal]) }}" class="d-inline">
+                            @csrf
+                            <button type="submit" class="btn btn-shamrock">Accept & resolve</button>
+                        </form>
+                        <form method="POST" action="{{ route('admin.resolution-proposals.deny', [$party, $proposal]) }}" class="d-inline">
+                            @csrf
+                            <input type="text" name="denial_reason" class="form-control form-control-sm d-inline-block" style="width:200px" placeholder="Denial reason (optional)">
+                            <button type="submit" class="btn btn-outline-danger btn-sm">Deny (forfeit proposer)</button>
+                        </form>
+                    </div>
+                </div>
+            @endforeach
+        </div>
+    </div>
+    @endif
+
     {{-- Create market --}}
     <div class="card shamrock-card mb-4">
         <div class="card-header shamrock-header">Create market</div>
@@ -133,7 +170,7 @@
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
                             <strong>{{ $market->title }}</strong>
-                            <span class="badge badge-shamrock ms-2">{{ $market->status }}</span>
+                            <span class="badge badge-shamrock ms-2">{{ $market->status === 'pending_resolution' ? 'Under review' : $market->status }}</span>
                             <span class="text-muted small">({{ $market->type }}, {{ $market->resolution_type }})</span>
                         </div>
                         <a href="{{ route('admin.parties.markets.edit', [$party, $market]) }}" class="btn btn-sm btn-outline-secondary">Edit</a>

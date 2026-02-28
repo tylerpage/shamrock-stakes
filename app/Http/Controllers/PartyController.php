@@ -4,13 +4,18 @@ namespace App\Http\Controllers;
 
 use App\Events\MarketOddsUpdated;
 use App\Events\PartyLeaderboardUpdated;
+use App\Events\PartyMarketsUpdated;
 use App\Models\Bet;
 use App\Models\Market;
 use App\Models\Party;
 use App\Models\PartyUser;
 use App\Models\PreVote;
+use App\Models\ResolutionProposal;
+use App\Models\ResolutionProposalPhoto;
+use App\Services\PushNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class PartyController extends Controller
 {
@@ -48,7 +53,7 @@ class PartyController extends Controller
     public function show(Party $party)
     {
         $this->authorize('view', $party);
-        $party->load(['markets.options', 'markets.preVotes', 'markets.bets', 'markets.resolution.winningOption']);
+        $party->load(['markets.options', 'markets.preVotes', 'markets.bets', 'markets.resolution.winningOption', 'markets.pendingResolutionProposal']);
         $user = auth()->user();
         $availableBalance = $user->balanceInParty($party);
         $portfolioValue = $user->portfolioValueInParty($party);
@@ -77,7 +82,7 @@ class PartyController extends Controller
     public function placeBet(Request $request, Party $party, Market $market)
     {
         $this->authorize('view', $party);
-        if ($market->party_id !== $party->id || !$market->isLive()) {
+        if ($market->party_id !== $party->id || !$market->isLive() || $market->isPendingResolution()) {
             abort(404);
         }
         $request->validate([
@@ -163,6 +168,68 @@ class PartyController extends Controller
         }
 
         return back()->with('success', 'Bet placed.');
+    }
+
+    public function proposeResolutionForm(Party $party, Market $market)
+    {
+        $this->authorize('view', $party);
+        if ($market->party_id !== $party->id || !$market->isLive() || $market->isPendingResolution()) {
+            abort(404);
+        }
+        $market->load('options');
+        return view('parties.propose-resolution', compact('party', 'market'));
+    }
+
+    public function proposeResolution(Request $request, Party $party, Market $market)
+    {
+        $this->authorize('view', $party);
+        if ($market->party_id !== $party->id || !$market->isLive() || $market->isPendingResolution()) {
+            abort(404);
+        }
+        $request->validate([
+            'winning_option_id' => ['required', 'exists:market_options,id'],
+            'description' => ['required', 'string', 'max:2000'],
+            'photos.*' => ['nullable', 'image', 'max:5120'],
+        ]);
+        $option = $market->options()->findOrFail($request->winning_option_id);
+
+        $proposal = DB::transaction(function () use ($market, $option, $request) {
+            $proposal = ResolutionProposal::create([
+                'market_id' => $market->id,
+                'user_id' => auth()->id(),
+                'winning_option_id' => $option->id,
+                'description' => $request->description,
+                'status' => ResolutionProposal::STATUS_PENDING,
+            ]);
+            if ($request->hasFile('photos')) {
+                $dir = 'resolution-proposals/' . $proposal->id;
+                foreach ($request->file('photos') as $photo) {
+                    $path = $photo->store($dir, 'public');
+                    ResolutionProposalPhoto::create([
+                        'resolution_proposal_id' => $proposal->id,
+                        'path' => $path,
+                    ]);
+                }
+            }
+            $market->update(['status' => Market::STATUS_PENDING_RESOLUTION]);
+            return $proposal;
+        });
+
+        $market->load(['options', 'preVotes', 'bets', 'resolution', 'pendingResolutionProposal']);
+        broadcast(new MarketOddsUpdated($market))->toOthers();
+        broadcast(new PartyMarketsUpdated($market->party))->toOthers();
+
+        if ($party->admin_id) {
+            app(PushNotificationService::class)->sendToUsers(
+                [$party->admin_id],
+                'Resolution proposed: ' . $market->title,
+                auth()->user()->name . ' proposed an outcome. Accept or deny in Admin.',
+                ['url' => route('admin.parties.show', $party)]
+            );
+        }
+
+        return redirect()->route('parties.show', $party)
+            ->with('success', 'Resolution proposed. The market is paused until an admin accepts or denies. You will lose your position if it is denied.');
     }
 
     public function leaderboard(Party $party)

@@ -18,6 +18,7 @@ class Market extends Model
     const STATUS_SETUP = 'setup';
     const STATUS_PRE_VOTING = 'pre_voting';
     const STATUS_LIVE = 'live';
+    const STATUS_PENDING_RESOLUTION = 'pending_resolution';
     const STATUS_RESOLVED = 'resolved';
 
     const RESOLUTION_OFFICIAL = 'official';
@@ -58,6 +59,17 @@ class Market extends Model
         return $this->hasOne(MarketResolution::class, 'market_id');
     }
 
+    public function resolutionProposals(): HasMany
+    {
+        return $this->hasMany(ResolutionProposal::class, 'market_id')->orderBy('created_at', 'desc');
+    }
+
+    /** Pending user-submitted resolution (market is paused until admin accepts/denies) */
+    public function pendingResolutionProposal(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(ResolutionProposal::class, 'market_id')->where('status', ResolutionProposal::STATUS_PENDING);
+    }
+
     public function isPreVoting(): bool
     {
         return $this->status === self::STATUS_PRE_VOTING;
@@ -71,6 +83,11 @@ class Market extends Model
     public function isResolved(): bool
     {
         return $this->status === self::STATUS_RESOLVED;
+    }
+
+    public function isPendingResolution(): bool
+    {
+        return $this->status === self::STATUS_PENDING_RESOLUTION;
     }
 
     /** Compute current odds (probability 0-1) per option from pre-votes or live bets */
@@ -94,7 +111,7 @@ class Market extends Model
                 $total++;
             }
         } else {
-            foreach ($this->bets as $b) {
+            foreach ($this->bets->whereNull('forfeited_at') as $b) {
                 $counts[$b->market_option_id] = ($counts[$b->market_option_id] ?? 0) + (float) $b->amount;
                 $total += (float) $b->amount;
             }
@@ -117,14 +134,14 @@ class Market extends Model
         if (!$this->isResolved() || !$this->relationLoaded('resolution') || !$this->resolution) {
             return ['staked' => 0.0, 'payout' => 0.0, 'win_loss' => 0.0];
         }
-        $myBets = $this->bets->where('user_id', $userId);
+        $myBets = $this->bets->where('user_id', $userId)->whereNull('forfeited_at');
         $staked = $myBets->sum(fn ($b) => (float) $b->amount * (float) $b->price);
         $pool = $this->bets->sum(fn ($b) => (float) $b->amount * (float) $b->price);
         $winningId = $this->resolution->winning_option_id;
-        $totalWinning = $this->bets->where('market_option_id', $winningId)->sum('amount');
+        $totalWinning = $this->bets->where('market_option_id', $winningId)->whereNull('forfeited_at')->sum('amount');
         $payout = 0.0;
         if ($totalWinning > 0 && $pool > 0) {
-            foreach ($myBets->where('market_option_id', $winningId) as $bet) {
+            foreach ($myBets->where('market_option_id', $winningId)->whereNull('forfeited_at') as $bet) {
                 $payout += $pool * ((float) $bet->amount / $totalWinning);
             }
         }

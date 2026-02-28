@@ -23,6 +23,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/parties/{party}', [PartyController::class, 'show'])->name('parties.show');
     Route::get('/parties/{party}/markets/{market}/bets', [PartyController::class, 'marketBets'])->name('parties.markets.bets');
     Route::post('/parties/{party}/markets/{market}/pre-vote', [PartyController::class, 'preVote'])->name('parties.pre-vote');
+    Route::get('/parties/{party}/markets/{market}/propose-resolution', [PartyController::class, 'proposeResolutionForm'])->name('parties.propose-resolution.form');
+    Route::post('/parties/{party}/markets/{market}/propose-resolution', [PartyController::class, 'proposeResolution'])->name('parties.propose-resolution');
     Route::post('/parties/{party}/markets/{market}/bet', [PartyController::class, 'placeBet'])->name('parties.bet');
     Route::get('/parties/{party}/leaderboard', [PartyController::class, 'leaderboard'])->name('parties.leaderboard');
     Route::post('/push-subscription', [App\Http\Controllers\PushSubscriptionController::class, 'store'])->name('push.subscribe');
@@ -45,5 +47,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/parties/{party}/start-live', [AdminPartyController::class, 'startLive'])->name('parties.start-live');
         Route::post('/parties/{party}/markets/{market}/resolve-official', [AdminPartyController::class, 'setOfficialOutcome'])->name('parties.markets.resolve-official');
         Route::post('/parties/{party}/markets/{market}/resolve-voting', [AdminPartyController::class, 'resolveVoting'])->name('parties.markets.resolve-voting');
+        Route::post('/parties/{party}/resolution-proposals/{proposal}/accept', [AdminPartyController::class, 'acceptResolutionProposal'])->name('resolution-proposals.accept');
+        Route::post('/parties/{party}/resolution-proposals/{proposal}/deny', [AdminPartyController::class, 'denyResolutionProposal'])->name('resolution-proposals.deny');
     });
 });

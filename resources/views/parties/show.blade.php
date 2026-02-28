@@ -15,7 +15,7 @@
     </div>
 
     @php
-        $activeMarkets = $party->markets->whereIn('status', ['setup', 'pre_voting', 'live']);
+        $activeMarkets = $party->markets->whereIn('status', ['setup', 'pre_voting', 'live', 'pending_resolution']);
         $resolvedMarkets = $party->markets->where('status', 'resolved');
     @endphp
 
@@ -35,7 +35,7 @@
                 <div class="card shamrock-card mb-4" data-market-id="{{ $market->id }}" data-market-title="{{ e($market->title) }}">
                     <div class="card-header shamrock-header d-flex justify-content-between align-items-center">
                         <span>{{ $market->title }}</span>
-                        <span class="badge badge-shamrock" data-market-status-badge>{{ $market->status }}</span>
+                        <span class="badge badge-shamrock" data-market-status-badge>{{ $market->isPendingResolution() ? 'Under review' : $market->status }}</span>
                     </div>
                     <div class="card-body">
                         <p class="text-muted small mb-3" data-market-type-line>
@@ -61,9 +61,21 @@
                             </form>
                         @endif
 
+                        @if($market->isPendingResolution())
+                            @php $pendingProposal = $market->pendingResolutionProposal; @endphp
+                            <div class="alert alert-warning mb-3" role="alert">
+                                <strong>Resolution under review</strong>
+                                @if($pendingProposal)
+                                    {{ $pendingProposal->user->name }} proposed <strong>{{ $pendingProposal->winningOption->label ?? '—' }}</strong> as the outcome. The market is paused until an admin accepts or denies. No new bets.
+                                @else
+                                    The market is paused pending resolution review. No new bets.
+                                @endif
+                            </div>
+                        @endif
+
                         @if($market->isLive())
                             @php
-                                $myBetsByOption = $market->bets->where('user_id', auth()->id())->groupBy('market_option_id');
+                                $myBetsByOption = $market->bets->where('user_id', auth()->id())->whereNull('forfeited_at')->groupBy('market_option_id');
                             @endphp
                             <p class="fw-bold" data-market-live-intro>
                                 @if($party->isBetInputDollars())
@@ -111,6 +123,10 @@
                                         </div>
                                     </div>
                                 @endforeach
+                            </div>
+                            <div class="mt-3">
+                                <a href="{{ route('parties.propose-resolution.form', [$party, $market]) }}" class="btn btn-outline-secondary btn-touch">Propose resolution</a>
+                                <span class="small text-muted ms-2">Submit the outcome you believe is true (with description and optional photos). Market will pause until an admin reviews. If denied, you forfeit your position.</span>
                             </div>
                         @endif
 
