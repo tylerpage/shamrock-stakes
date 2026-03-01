@@ -75,8 +75,9 @@ class User extends Authenticatable
     }
 
     /**
-     * Total portfolio value in party: available balance + mark-to-market value of open positions
-     * (bets in live markets, valued at current odds). Only realized cash can be used to place bets.
+     * Portfolio in party: available balance + total staked in live markets (cost basis only).
+     * This is zero-sum: no mark-to-market, so the total across all users stays consistent
+     * with the money in the system. Payouts come from other players when markets resolve.
      */
     public function portfolioValueInParty(Party $party): float
     {
@@ -85,17 +86,11 @@ class User extends Authenticatable
         if ($liveMarketIds->isEmpty()) {
             return $available;
         }
-        $openBets = \App\Models\Bet::where('user_id', $this->id)
+        $staked = \App\Models\Bet::where('user_id', $this->id)
             ->whereNull('forfeited_at')
             ->whereIn('market_id', $liveMarketIds)
-            ->with(['market' => fn ($q) => $q->with(['options', 'bets', 'preVotes'])])
-            ->get();
-        $unrealized = 0;
-        foreach ($openBets as $bet) {
-            $odds = $bet->market->odds;
-            $prob = $odds[$bet->market_option_id] ?? 0;
-            $unrealized += (float) $bet->amount * $prob;
-        }
-        return round($available + $unrealized, 2);
+            ->get()
+            ->sum(fn ($bet) => (float) $bet->amount * (float) $bet->price);
+        return round($available + $staked, 2);
     }
 }
