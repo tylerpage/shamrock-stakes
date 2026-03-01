@@ -15,7 +15,7 @@ return [
     |
     */
 
-    'default' => env('BROADCAST_DRIVER', 'null'),
+    'default' => env('BROADCAST_DRIVER', env('BROADCAST_CONNECTION', 'null')),
 
     /*
     |--------------------------------------------------------------------------
@@ -32,15 +32,29 @@ return [
 
         'pusher' => [
             'driver' => 'pusher',
-            'key' => env('PUSHER_APP_KEY'),
-            'secret' => env('PUSHER_APP_SECRET'),
-            'app_id' => env('PUSHER_APP_ID'),
+            'key' => env('REVERB_APP_KEY', env('PUSHER_APP_KEY')),
+            'secret' => env('REVERB_APP_SECRET', env('PUSHER_APP_SECRET')),
+            'app_id' => env('REVERB_APP_ID', env('PUSHER_APP_ID')),
             'options' => [
                 'cluster' => env('PUSHER_APP_CLUSTER', 'mt1'),
-                'useTLS' => env('PUSHER_SCHEME', 'https') === 'https',
-                'host' => env('PUSHER_HOST', '127.0.0.1'),
-                'port' => env('PUSHER_PORT', 6001),
-                'scheme' => env('PUSHER_SCHEME', 'http'),
+                'useTLS' => (env('REVERB_SCHEME', env('PUSHER_SCHEME', 'https'))) === 'https',
+                'host' => env('REVERB_HOST', env('PUSHER_HOST', '127.0.0.1')),
+                'port' => (int) env('REVERB_PORT', env('PUSHER_PORT', 6001)),
+                'scheme' => env('REVERB_SCHEME', env('PUSHER_SCHEME', 'http')),
+            ],
+        ],
+
+        'reverb' => [
+            'driver' => 'pusher',
+            'key' => env('REVERB_APP_KEY'),
+            'secret' => env('REVERB_APP_SECRET'),
+            'app_id' => env('REVERB_APP_ID'),
+            'options' => [
+                'cluster' => 'mt1',
+                'useTLS' => env('REVERB_SCHEME', 'https') === 'https',
+                'host' => env('REVERB_HOST'),
+                'port' => (int) env('REVERB_PORT', 443),
+                'scheme' => env('REVERB_SCHEME', 'https'),
             ],
         ],
 

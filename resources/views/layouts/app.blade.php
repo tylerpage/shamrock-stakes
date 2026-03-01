@@ -8,25 +8,50 @@
     <link rel="manifest" href="{{ asset('manifest.json') }}">
     <title>@yield('title', 'Shamrock Stakes') — {{ config('app.name', 'Shamrock Stakes') }}</title>
     @php
-        $wsHost = null;
+        // Echo config so the browser connects to the right WebSocket (not 127.0.0.1 when deployed).
+        // Priority: SOKETI_PUBLIC_URL (e.g. ngrok) → REVERB_* (Laravel Cloud) → PUSHER_* (Soketi/local).
+        $echoConfig = null;
         $soketiUrl = rtrim(config('services.soketi.public_url', ''), '/');
         if ($soketiUrl !== '') {
             $parsed = parse_url($soketiUrl);
-            $wsHost = $parsed['host'] ?? null;
-            $useTls = ($parsed['scheme'] ?? '') === 'https';
-            $wsPort = isset($parsed['port']) ? (int) $parsed['port'] : ($useTls ? 443 : 80);
+            $host = $parsed['host'] ?? null;
+            if (!empty($host)) {
+                $useTls = ($parsed['scheme'] ?? '') === 'https';
+                $port = isset($parsed['port']) ? (int) $parsed['port'] : ($useTls ? 443 : 80);
+                $echoConfig = [
+                    'wsHost' => $host,
+                    'wsPort' => $port,
+                    'wssPort' => $port,
+                    'forceTLS' => $useTls,
+                    'key' => config('broadcasting.connections.pusher.key', 'app-key'),
+                    'cluster' => config('broadcasting.connections.pusher.options.cluster', 'mt1'),
+                ];
+            }
+        }
+        if ($echoConfig === null && env('REVERB_APP_KEY')) {
+            $echoConfig = [
+                'wsHost' => env('REVERB_HOST'),
+                'wsPort' => (int) env('REVERB_PORT', 443),
+                'wssPort' => (int) env('REVERB_PORT', 443),
+                'forceTLS' => env('REVERB_SCHEME', 'https') === 'https',
+                'key' => env('REVERB_APP_KEY'),
+                'cluster' => 'mt1',
+            ];
+        }
+        if ($echoConfig === null && config('broadcasting.connections.pusher.key')) {
+            $echoConfig = [
+                'wsHost' => config('broadcasting.connections.pusher.options.host'),
+                'wsPort' => (int) config('broadcasting.connections.pusher.options.port'),
+                'wssPort' => (int) config('broadcasting.connections.pusher.options.port'),
+                'forceTLS' => config('broadcasting.connections.pusher.options.useTLS'),
+                'key' => config('broadcasting.connections.pusher.key'),
+                'cluster' => config('broadcasting.connections.pusher.options.cluster', 'mt1'),
+            ];
         }
     @endphp
-    @if(!empty($wsHost))
+    @if(!empty($echoConfig))
     <script>
-        window.SHAMROCK_ECHO_CONFIG = {
-            wsHost: "{{ $wsHost }}",
-            wsPort: {{ $wsPort }},
-            wssPort: {{ $wsPort }},
-            forceTLS: {{ $useTls ? 'true' : 'false' }},
-            key: "{{ config('broadcasting.connections.pusher.key', 'app-key') }}",
-            cluster: "{{ config('broadcasting.connections.pusher.options.cluster', 'mt1') }}"
-        };
+        window.SHAMROCK_ECHO_CONFIG = @json($echoConfig);
     </script>
     @endif
     @php
