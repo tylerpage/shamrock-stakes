@@ -53,11 +53,14 @@ class Party extends Model
         return $this->hasMany(PartyInvitation::class)->orderBy('invited_at', 'desc');
     }
 
-    /** Leaderboard rows: available, portfolio, change_pct (from default_balance), sorted by portfolio desc. */
+    /** Leaderboard rows: available, portfolio, change_pct (from default_balance), sorted by portfolio desc. House user is excluded. */
     public function getLeaderboardMembers(): \Illuminate\Support\Collection
     {
+        $houseEmail = \App\Services\HouseMarketSeedService::HOUSE_EMAIL;
         $default = (float) $this->default_balance;
-        return $this->members()->with('user')->get()->map(function ($m) use ($default) {
+        return $this->members()->with('user')->get()
+            ->filter(fn ($m) => $m->user && $m->user->email !== $houseEmail)
+            ->map(function ($m) use ($default) {
             $portfolio = $m->user->portfolioValueInParty($this);
             $changePct = $default > 0
                 ? round((($portfolio - $default) / $default) * 100, 1)

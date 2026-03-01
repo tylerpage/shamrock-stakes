@@ -233,7 +233,7 @@ class PartyController extends Controller
     }
 
     /** Fraction of the party's default (starting) balance the house uses to seed each market at go-live. */
-    private const HOUSE_SEED_FRACTION = 0.25;
+    private const HOUSE_SEED_FRACTION = 0.10;
 
     public function startLive(Party $party)
     {
@@ -270,7 +270,7 @@ class PartyController extends Controller
         broadcast(new PartyMarketsUpdated($party))->toOthers();
         broadcast(new PartyLeaderboardUpdated($party))->toOthers();
 
-        return back()->with('success', 'Markets are now live. The house placed seed bets (25% of starting balance per market) from the survey odds.');
+        return back()->with('success', 'Markets are now live. The house placed seed bets (10% of starting balance per market) from the survey odds.');
     }
 
     /** Get or create the system "House" user used for seed bets. */
@@ -301,7 +301,7 @@ class PartyController extends Controller
     }
 
     /**
-     * Place house seed bets for this market: 25% of the party's default balance,
+     * Place house seed bets for this market: 10% of the party's default balance,
      * distributed across options in the survey (pre-vote) ratio. E.g. Yes 2 votes, No 3 → 2/5 and 3/5 of the amount.
      */
     private function seedMarketWithHouseBets(Market $market, int $houseUserId, float $seedBudget): void

@@ -7,7 +7,7 @@
     <div class="row justify-content-center">
         <div class="col-md-8 col-lg-6">
             <h1 class="mb-3" style="font-family: 'Bebas Neue', sans-serif; color: #0d3328;">Create a market</h1>
-            <p class="text-muted mb-4">Add a Yes/No market to <strong>{{ $party->name }}</strong>. It will go live immediately (no pre-vote). The house will seed 25% on Yes and 25% on No so odds don’t swing too much at the start.</p>
+            <p class="text-muted mb-4">Add a Yes/No market to <strong>{{ $party->name }}</strong>. It will go live immediately (no pre-vote). The house will seed 10% on Yes and 10% on No so odds don’t swing too much at the start.</p>
             <div class="card shamrock-card border-0 shadow">
                 <div class="card-header shamrock-header rounded-0 py-3">New market</div>
                 <div class="card-body p-4">

@@ -71,7 +71,7 @@ class PartyController extends Controller
         broadcast(new PartyMarketsUpdated($party))->toOthers();
         broadcast(new PartyLeaderboardUpdated($party))->toOthers();
 
-        return redirect()->route('parties.show', $party)->with('success', 'Market created and live. The house seeded 25% on Yes and 25% on No to keep odds stable.');
+        return redirect()->route('parties.show', $party)->with('success', 'Market created and live. The house seeded 10% on Yes and 10% on No to keep odds stable.');
     }
 
     public function marketBets(Party $party, Market $market)

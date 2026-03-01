@@ -11,13 +11,16 @@ use Illuminate\Support\Facades\DB;
 
 class HouseMarketSeedService
 {
-    /** Fraction of the party's default balance the house places on each option for equal seeding (e.g. 25% on Yes, 25% on No). */
-    public const SEED_PER_OPTION_FRACTION = 0.25;
+    /** Fraction of the party's default balance the house places on each option for equal seeding (e.g. 10% on Yes, 10% on No). */
+    public const SEED_PER_OPTION_FRACTION = 0.10;
+
+    /** Email of the system House user (excluded from leaderboards). */
+    public const HOUSE_EMAIL = 'house@shamrock-stakes.internal';
 
     public function getOrCreateHouseUser(): User
     {
         return User::firstOrCreate(
-            ['email' => 'house@shamrock-stakes.internal'],
+            ['email' => self::HOUSE_EMAIL],
             [
                 'name' => 'House',
                 'password' => bcrypt(str()->random(32)),
@@ -40,7 +43,7 @@ class HouseMarketSeedService
     }
 
     /**
-     * Seed market with equal house bets: 25% of party's default balance on each option (e.g. Yes and No each get 25%).
+     * Seed market with equal house bets: 10% of party's default balance on each option (e.g. Yes and No each get 10%).
      * Reduces initial odds swing. No pre-vote; odds start at 50/50 for yes/no.
      */
     public function seedMarketEqual(Market $market, float $seedPerOptionDollars): void
@@ -61,7 +64,7 @@ class HouseMarketSeedService
         $party = $market->party;
         $house = $this->getOrCreateHouseUser();
         // Spend seedPerOptionDollars on each option: cost = amount * price => amount = seedPerOptionDollars / price = seedPerOptionDollars * n
-        $totalCost = round($seedPerOptionDollars * $n, 2); // e.g. 25% * 2 options = 50% of default
+        $totalCost = round($seedPerOptionDollars * $n, 2); // e.g. 10% * 2 options = 20% of default
 
         DB::transaction(function () use ($market, $party, $house, $options, $seedPerOptionDollars, $price, $n, $totalCost) {
             $partyUser = PartyUser::where('party_id', $party->id)
