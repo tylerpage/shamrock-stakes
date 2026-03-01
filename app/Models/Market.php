@@ -110,6 +110,9 @@ class Market extends Model
                 $counts[$v->market_option_id] = ($counts[$v->market_option_id] ?? 0) + 1;
                 $total++;
             }
+            // Ensure at least one vote per option so odds are never 0% or 100%
+            $counts = $this->ensureMinimumOnePerOption($counts);
+            $total = array_sum($counts);
         } else {
             foreach ($this->bets->whereNull('forfeited_at') as $b) {
                 $counts[$b->market_option_id] = ($counts[$b->market_option_id] ?? 0) + (float) $b->amount;
@@ -147,7 +150,39 @@ class Market extends Model
             $n = count($optionIds);
             return array_combine($optionIds, array_fill(0, $n, 1 / $n));
         }
+        $counts = $this->ensureMinimumOnePerOption($counts);
+        $total = array_sum($counts);
         return array_map(fn ($c) => $c / $total, $counts);
+    }
+
+    /**
+     * Total stake (pool) and contracts per option for non-forfeited bets.
+     * Used to show "to win $X" payout estimate. Returns ['pool' => float, 'option_totals' => [option_id => float]].
+     */
+    public function poolAndOptionTotals(): array
+    {
+        $bets = $this->relationLoaded('bets') ? $this->bets->whereNull('forfeited_at') : $this->bets()->whereNull('forfeited_at')->get();
+        $pool = $bets->sum(fn ($b) => (float) $b->amount * (float) $b->price);
+        $optionIds = $this->options->pluck('id')->all();
+        $totals = array_fill_keys($optionIds, 0.0);
+        foreach ($bets as $b) {
+            if (isset($totals[$b->market_option_id])) {
+                $totals[$b->market_option_id] += (float) $b->amount;
+            }
+        }
+        return ['pool' => round($pool, 2), 'option_totals' => array_map(fn ($t) => round($t, 2), $totals)];
+    }
+
+    /**
+     * Ensure each option has at least one (virtual) vote so odds are never 0% or 100%.
+     * E.g. 0 and 5 votes becomes 1 and 5 → 1/6 and 5/6.
+     */
+    private function ensureMinimumOnePerOption(array $counts): array
+    {
+        foreach ($counts as $id => $c) {
+            $counts[$id] = max(1, (int) $c);
+        }
+        return $counts;
     }
 
     /**

@@ -76,6 +76,9 @@
                         @if($market->isLive())
                             @php
                                 $myBetsByOption = $market->bets->where('user_id', auth()->id())->whereNull('forfeited_at')->groupBy('market_option_id');
+                                $poolData = $market->poolAndOptionTotals();
+                                $totalPool = $poolData['pool'];
+                                $optionTotals = $poolData['option_totals'];
                             @endphp
                             <p class="fw-bold" data-market-live-intro>
                                 @if($party->isBetInputDollars())
@@ -93,8 +96,10 @@
                                         $myContracts = $myBetsByOption->get($option->id, collect());
                                         $myTotal = $myContracts->sum('amount');
                                         $myCost = $myContracts->sum(fn ($b) => $b->amount * (float) $b->price);
+                                        $totalOnOption = $optionTotals[$option->id] ?? 0;
+                                        $toWin = ($totalPool > 0 && $myTotal > 0) ? round($totalPool * ($myTotal / max($totalOnOption, $myTotal)), 2) : null;
                                     @endphp
-                                    <div class="col-md-6 mb-2" data-option-id="{{ $option->id }}">
+                                    <div class="col-md-6 mb-2" data-option-id="{{ $option->id }}" data-pool="{{ $totalPool }}" data-total-on-option="{{ $totalOnOption }}" data-my-contracts="{{ $myTotal }}">
                                         <div class="border rounded p-2" style="border-color: #0d3328 !important;">
                                             <div class="d-flex align-items-center mb-1">
                                                 @if($option->image_url)<img src="{{ $option->image_url }}" alt="" class="rounded me-2" style="height:36px;width:36px;object-fit:cover">@endif
@@ -102,7 +107,7 @@
                                                 <span class="ms-auto" data-option-odds>{{ number_format($priceForBet * 100, 0) }}¢</span>
                                             </div>
                                             <div class="odds-bar"><div class="odds-fill" data-option-odds-bar style="width:{{ min(100, $priceForBet * 100) }}%"></div></div>
-                                            <p class="small text-muted mb-1 mt-1" data-option-position style="{{ $myTotal > 0 ? '' : 'display:none;' }}">Your position: <span data-option-position-text>{{ $myTotal > 0 ? number_format($myTotal, 1) . ' contracts ($' . number_format($myCost, 2) . ' staked)' : '' }}</span></p>
+                                            <p class="small text-muted mb-1 mt-1" data-option-position style="{{ $myTotal > 0 ? '' : 'display:none;' }}">Your position: <span data-option-position-text>{{ $myTotal > 0 ? number_format($myTotal, 1) . ' contracts ($' . number_format($myCost, 2) . ' staked)' : '' }}</span>@if($toWin !== null)<span data-option-to-win> — to win ~${{ number_format($toWin, 2) }}</span>@else<span data-option-to-win style="display:none;"></span>@endif</p>
                                             <form method="POST" action="{{ route('parties.bet', [$party, $market]) }}" class="mt-2 bet-form" data-bet-form data-bet-input-mode="{{ $party->isBetInputDollars() ? 'dollars' : 'contracts' }}">
                                                 @csrf
                                                 <input type="hidden" name="market_option_id" value="{{ $option->id }}">
@@ -117,6 +122,7 @@
                                                     <button type="submit" class="btn btn-shamrock btn-touch" data-bet-submit>{{ $myTotal > 0 ? 'Buy more' : 'Buy' }}</button>
                                                 </div>
                                                 <p class="small mb-0 mt-1" data-bet-cost>{{ $party->isBetInputDollars() ? 'You\'re spending: $0.00' : 'Cost: $0.00' }}</p>
+                                                <p class="small text-muted mb-0 mt-0" data-bet-to-win style="display:none;">To win ~$0.00</p>
                                                 <div class="text-danger small" data-bet-error style="display:none;"></div>
                                                 @error('amount')<div class="text-danger small">{{ $message }}</div>@enderror
                                             </form>
@@ -241,16 +247,36 @@
     var amountEl = form.querySelector('[data-bet-amount]');
     var priceEl = form.querySelector('[data-option-price-input]');
     var costEl = form.querySelector('[data-bet-cost]');
+    var toWinEl = form.querySelector('[data-bet-to-win]');
     if (!costEl || !amountEl || !priceEl) return;
     var isDollars = form.getAttribute('data-bet-input-mode') === 'dollars';
+    var optionBlock = form.closest('[data-option-id]');
+    var pool = optionBlock ? parseFloat(optionBlock.getAttribute('data-pool')) || 0 : 0;
+    var totalOnOption = optionBlock ? parseFloat(optionBlock.getAttribute('data-total-on-option')) || 0 : 0;
+    var cost = 0, contracts = 0;
     if (isDollars) {
       var dollars = parseFloat(amountEl.value) || 0;
+      cost = dollars;
+      var price = parseFloat(priceEl.value) || 0.01;
+      contracts = price > 0 ? dollars / price : 0;
       costEl.textContent = 'You\'re spending: $' + (dollars > 0 ? dollars.toFixed(2) : '0.00');
     } else {
       var amount = parseFloat(amountEl.value) || 0;
       var price = parseFloat(priceEl.value) || 0;
-      var cost = amount * price;
+      cost = amount * price;
+      contracts = amount;
       costEl.textContent = 'Cost: $' + (cost > 0 ? cost.toFixed(2) : '0.00');
+    }
+    if (toWinEl) {
+      if (cost > 0 && contracts > 0) {
+        var newPool = pool + cost;
+        var newTotalOnOption = totalOnOption + contracts;
+        var toWin = newPool * (contracts / newTotalOnOption);
+        toWinEl.textContent = 'To win ~$' + toWin.toFixed(2);
+        toWinEl.style.display = '';
+      } else {
+        toWinEl.style.display = 'none';
+      }
     }
   }
   document.querySelectorAll('[data-bet-form]').forEach(function (form) {
@@ -304,7 +330,18 @@
           if (data.portfolio !== undefined && portfolioEl) {
             portfolioEl.textContent = 'Portfolio: $' + parseFloat(data.portfolio).toFixed(2);
           }
+          if (data.pool !== undefined && data.option_totals) {
+            marketCard.querySelectorAll('[data-option-id]').forEach(function (optionBlock) {
+              var oid = optionBlock.getAttribute('data-option-id');
+              if (oid && data.option_totals[oid] !== undefined) {
+                optionBlock.setAttribute('data-pool', data.pool);
+                optionBlock.setAttribute('data-total-on-option', data.option_totals[oid]);
+              }
+            });
+          }
           if (marketId && data.market_id === parseInt(marketId, 10) && data.positions) {
+            var pool = data.pool != null ? parseFloat(data.pool) : 0;
+            var optionTotals = data.option_totals || {};
             Object.keys(data.positions).forEach(function (optionId) {
               var pos = data.positions[optionId];
               var optionBlock = marketCard.querySelector('[data-option-id="' + optionId + '"]');
@@ -313,6 +350,7 @@
               var barEl = optionBlock.querySelector('[data-option-odds-bar]');
               var posEl = optionBlock.querySelector('[data-option-position]');
               var posTextEl = optionBlock.querySelector('[data-option-position-text]');
+              var toWinSpan = optionBlock.querySelector('[data-option-to-win]');
               var priceInput = optionBlock.querySelector('[data-option-price-input]');
               if (oddsEl) oddsEl.textContent = Math.round(pos.price * 100) + '¢';
               if (barEl) barEl.style.width = Math.min(100, pos.price * 100) + '%';
@@ -321,10 +359,20 @@
                 if (pos.total > 0) {
                   posTextEl.textContent = parseFloat(pos.total).toFixed(1) + ' contracts ($' + parseFloat(pos.cost).toFixed(2) + ' staked)';
                   posEl.style.display = '';
+                  optionBlock.setAttribute('data-my-contracts', pos.total);
+                  var totalOnOpt = parseFloat(optionTotals[optionId]) || 0;
+                  var toWin = (pool > 0 && pos.total > 0) ? (pool * (pos.total / Math.max(totalOnOpt, pos.total))).toFixed(2) : null;
+                  if (toWinSpan) {
+                    if (toWin !== null) { toWinSpan.textContent = ' — to win ~$' + toWin; toWinSpan.style.display = ''; }
+                    else { toWinSpan.style.display = 'none'; }
+                  }
                 } else {
                   posEl.style.display = 'none';
+                  optionBlock.setAttribute('data-my-contracts', '0');
+                  if (toWinSpan) toWinSpan.style.display = 'none';
                 }
               }
+              optionBlock.querySelectorAll('[data-bet-form]').forEach(function (f) { updateBetCost(f); });
             });
           }
           var amountInput = form.querySelector('[data-bet-amount]');
@@ -462,6 +510,23 @@
             });
             var closedMsg = card.querySelector('[data-market-closed-message]');
             if (closedMsg) closedMsg.classList.remove('d-none');
+          }
+          if (e.pool != null && e.option_totals) {
+            card.querySelectorAll('[data-option-id]').forEach(function (optionBlock) {
+              var oid = optionBlock.getAttribute('data-option-id');
+              if (oid && e.option_totals[oid] !== undefined) {
+                optionBlock.setAttribute('data-pool', e.pool);
+                optionBlock.setAttribute('data-total-on-option', e.option_totals[oid]);
+                var myContracts = parseFloat(optionBlock.getAttribute('data-my-contracts')) || 0;
+                var toWinSpan = optionBlock.querySelector('[data-option-to-win]');
+                if (toWinSpan && myContracts > 0 && e.pool > 0) {
+                  var totalOnOpt = parseFloat(e.option_totals[oid]) || 0;
+                  var toWin = (e.pool * (myContracts / Math.max(totalOnOpt, myContracts))).toFixed(2);
+                  toWinSpan.textContent = ' — to win ~$' + toWin;
+                  toWinSpan.style.display = '';
+                }
+              }
+            });
           }
           if (e.odds) {
             var odds = e.odds;

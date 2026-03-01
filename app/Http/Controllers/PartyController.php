@@ -156,6 +156,7 @@ class PartyController extends Controller
                 ];
             }
             $portfolioValue = auth()->user()->portfolioValueInParty($party);
+            $poolData = $market->poolAndOptionTotals();
             return response()->json([
                 'success' => true,
                 'message' => 'Bet placed.',
@@ -164,6 +165,8 @@ class PartyController extends Controller
                 'market_id' => $market->id,
                 'odds' => $odds,
                 'positions' => $positions,
+                'pool' => $poolData['pool'],
+                'option_totals' => $poolData['option_totals'],
             ]);
         }
 

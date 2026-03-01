@@ -32,11 +32,14 @@ class MarketOddsUpdated implements ShouldBroadcastNow
     public function broadcastWith(): array
     {
         $this->market->load(['options', 'preVotes', 'bets.user', 'bets.marketOption', 'resolution.winningOption']);
+        $poolData = $this->market->poolAndOptionTotals();
         $payload = [
             'market_id' => $this->market->id,
             'status' => $this->market->status,
             'odds' => $this->market->odds,
             'options' => $this->market->options->mapWithKeys(fn ($o) => [$o->id => $o->label])->all(),
+            'pool' => $poolData['pool'],
+            'option_totals' => $poolData['option_totals'],
             'recent_bets' => $this->market->bets->take(10)->map(fn ($b) => [
                 'user_name' => $b->user->name ?? '—',
                 'amount' => (float) $b->amount,
