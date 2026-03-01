@@ -14,8 +14,10 @@ use App\Models\PartyInvitation;
 use App\Models\PartyUser;
 use App\Models\ResolutionProposal;
 use App\Models\User;
+use App\Mail\PartyInvitationMail;
 use App\Services\PushNotificationService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
@@ -86,6 +88,7 @@ class PartyController extends Controller
                 'balance' => $party->default_balance,
                 'invited_at' => now(),
             ]);
+            Mail::to($user->email)->send(new PartyInvitationMail($party, $user->email, true));
             return back()->with('success', 'Invited ' . $user->name . '. They can open the party from My Parties.');
         }
 
@@ -96,6 +99,7 @@ class PartyController extends Controller
             'email' => $email,
             'invited_at' => now(),
         ]);
+        Mail::to($email)->send(new PartyInvitationMail($party, $email, false));
         return back()->with('success', 'Invitation sent. When they register with ' . $email . ', they’ll see this party on My Parties.');
     }
 
