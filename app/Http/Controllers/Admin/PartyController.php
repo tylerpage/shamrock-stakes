@@ -232,8 +232,8 @@ class PartyController extends Controller
         return back()->with('success', 'Pre-voting started. Participants can set initial odds.');
     }
 
-    /** Fraction of each user's balance used to seed markets at go-live (from pre-vote odds). */
-    private const SEED_BALANCE_FRACTION = 0.25;
+    /** Fraction of the party's default (starting) balance the house uses to seed each market at go-live. */
+    private const HOUSE_SEED_FRACTION = 0.25;
 
     public function startLive(Party $party)
     {
@@ -244,8 +244,15 @@ class PartyController extends Controller
             ->with(['options', 'preVotes'])
             ->get();
 
-        foreach ($markets as $market) {
-            $this->seedMarketFromPreVoteOdds($market);
+        $house = $this->getOrCreateHouseUser();
+        $houseSeedPerMarket = (float) $party->default_balance * self::HOUSE_SEED_FRACTION;
+        $totalHouseBalance = round($houseSeedPerMarket * $markets->count(), 2);
+
+        if ($totalHouseBalance >= 0.01) {
+            $this->ensureHouseInParty($party, $house->id, $totalHouseBalance);
+            foreach ($markets as $market) {
+                $this->seedMarketWithHouseBets($market, $house->id, $houseSeedPerMarket);
+            }
         }
 
         $party->markets()->whereIn('status', [Market::STATUS_SETUP, Market::STATUS_PRE_VOTING])
@@ -263,63 +270,92 @@ class PartyController extends Controller
         broadcast(new PartyMarketsUpdated($party))->toOthers();
         broadcast(new PartyLeaderboardUpdated($party))->toOthers();
 
-        return back()->with('success', 'Markets are now live. Seed bets were placed from pre-vote odds (25% of each balance).');
+        return back()->with('success', 'Markets are now live. The house placed seed bets (25% of starting balance per market) from the survey odds.');
+    }
+
+    /** Get or create the system "House" user used for seed bets. */
+    private function getOrCreateHouseUser(): User
+    {
+        return User::firstOrCreate(
+            ['email' => 'house@shamrock-stakes.internal'],
+            [
+                'name' => 'House',
+                'password' => bcrypt(str()->random(32)),
+            ]
+        );
+    }
+
+    /** Ensure the House user is in the party with at least the given balance (for placing seed bets). */
+    private function ensureHouseInParty(Party $party, int $houseUserId, float $balance): void
+    {
+        $exists = PartyUser::where('party_id', $party->id)->where('user_id', $houseUserId)->exists();
+        if ($exists) {
+            PartyUser::where('party_id', $party->id)->where('user_id', $houseUserId)->increment('balance', $balance);
+        } else {
+            $party->users()->attach($houseUserId, [
+                'balance' => $balance,
+                'invited_at' => now(),
+                'joined_at' => now(),
+            ]);
+        }
     }
 
     /**
-     * Place seed bets for this market using pre-vote odds: each party member spends
-     * 25% of their balance, distributed across options by survey odds, to reduce initial swing.
+     * Place house seed bets for this market: 25% of the party's default balance,
+     * distributed across options in the survey (pre-vote) ratio. E.g. Yes 2 votes, No 3 → 2/5 and 3/5 of the amount.
      */
-    private function seedMarketFromPreVoteOdds(Market $market): void
+    private function seedMarketWithHouseBets(Market $market, int $houseUserId, float $seedBudget): void
     {
         $odds = $market->getPreVoteOdds();
         if (empty($odds)) {
             return;
         }
 
+        $seedBudget = round($seedBudget, 2);
+        if ($seedBudget < 0.01) {
+            return;
+        }
+
         $party = $market->party;
 
-        DB::transaction(function () use ($market, $party, $odds) {
-            $members = PartyUser::where('party_id', $party->id)
+        DB::transaction(function () use ($market, $party, $odds, $houseUserId, $seedBudget) {
+            $partyUser = PartyUser::where('party_id', $party->id)
+                ->where('user_id', $houseUserId)
                 ->lockForUpdate()
-                ->get();
+                ->first();
 
-            foreach ($members as $partyUser) {
-                $balance = (float) $partyUser->balance;
-                $seedBudget = round($balance * self::SEED_BALANCE_FRACTION, 2);
-                if ($seedBudget < 0.01) {
+            if (!$partyUser || (float) $partyUser->balance < $seedBudget) {
+                return;
+            }
+
+            $totalCost = 0.0;
+            $betsToCreate = [];
+
+            foreach ($market->options as $option) {
+                $optionId = $option->id;
+                $prob = $odds[$optionId] ?? (1 / count($odds));
+                $prob = max(0.01, min(1.0, (float) $prob));
+                $cost = round($seedBudget * $prob, 2);
+                if ($cost < 0.01) {
                     continue;
                 }
+                $totalCost += $cost;
+                $betsToCreate[] = [
+                    'market_id' => $market->id,
+                    'user_id' => $houseUserId,
+                    'market_option_id' => $optionId,
+                    'amount' => $seedBudget,
+                    'price' => round($prob, 4),
+                ];
+            }
 
-                $totalCost = 0.0;
-                $betsToCreate = [];
+            if ($totalCost < 0.01 || $totalCost > (float) $partyUser->balance) {
+                return;
+            }
 
-                foreach ($market->options as $option) {
-                    $optionId = $option->id;
-                    $prob = $odds[$optionId] ?? (1 / count($odds));
-                    $prob = max(0.01, min(1.0, (float) $prob));
-                    $cost = round($seedBudget * $prob, 2);
-                    if ($cost < 0.01) {
-                        continue;
-                    }
-                    $totalCost += $cost;
-                    $betsToCreate[] = [
-                        'market_id' => $market->id,
-                        'user_id' => $partyUser->user_id,
-                        'market_option_id' => $optionId,
-                        'amount' => $seedBudget,
-                        'price' => round($prob, 4),
-                    ];
-                }
-
-                if ($totalCost > $balance || $totalCost < 0.01) {
-                    continue;
-                }
-
-                $partyUser->decrement('balance', $totalCost);
-                foreach ($betsToCreate as $attrs) {
-                    Bet::create($attrs);
-                }
+            $partyUser->decrement('balance', $totalCost);
+            foreach ($betsToCreate as $attrs) {
+                Bet::create($attrs);
             }
         });
     }
