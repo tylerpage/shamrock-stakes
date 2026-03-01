@@ -22,6 +22,8 @@ Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name
 Route::middleware(['auth', 'not_blocked'])->group(function () {
     Route::get('/parties', [PartyController::class, 'index'])->name('parties.index');
     Route::get('/parties/{party}', [PartyController::class, 'show'])->name('parties.show');
+    Route::get('/parties/{party}/markets/create', [PartyController::class, 'createMarketForm'])->name('parties.markets.create');
+    Route::post('/parties/{party}/markets', [PartyController::class, 'storeMarket'])->name('parties.markets.store');
     Route::get('/parties/{party}/markets/{market}/bets', [PartyController::class, 'marketBets'])->name('parties.markets.bets');
     Route::post('/parties/{party}/markets/{market}/pre-vote', [PartyController::class, 'preVote'])->name('parties.pre-vote');
     Route::get('/parties/{party}/markets/{market}/propose-resolution', [PartyController::class, 'proposeResolutionForm'])->name('parties.propose-resolution.form');

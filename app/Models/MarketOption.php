@@ -31,6 +31,6 @@ class MarketOption extends Model
         if (!$this->image_path) {
             return null;
         }
-        return Storage::disk('public')->url($this->image_path);
+        return Storage::disk(config('filesystems.media_disk'))->url($this->image_path);
     }
 }

@@ -17,6 +17,6 @@ class ResolutionProposalPhoto extends Model
 
     public function url(): string
     {
-        return Storage::disk('public')->url($this->path);
+        return Storage::disk(config('filesystems.media_disk'))->url($this->path);
     }
 }

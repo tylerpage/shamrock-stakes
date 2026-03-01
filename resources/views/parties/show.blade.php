@@ -10,6 +10,7 @@
             <span class="badge bg-success me-0 fs-4 px-3 py-2" id="party-available">Available: ${{ number_format($availableBalance, 2) }}</span>
             <span class="badge bg-dark me-0 fs-5 px-2 py-1" id="party-portfolio">Portfolio: ${{ number_format($portfolioValue, 2) }}</span>
             <a href="{{ route('parties.leaderboard', $party) }}" class="btn btn-shamrock btn-sm btn-touch">Leaderboard</a>
+            <a href="{{ route('parties.markets.create', $party) }}" class="btn btn-outline-primary btn-sm btn-touch">Create market</a>
             <a href="{{ route('parties.index') }}" class="btn btn-outline-secondary btn-sm btn-touch">Back</a>
         </div>
     </div>

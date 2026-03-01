@@ -16,6 +16,12 @@ return [
     'default' => env('FILESYSTEM_DRIVER', 'local'),
 
     /*
+    | Disk used for user-uploaded media (market option images, resolution photos).
+    | Use 'public' for local (storage/app/public + symlink); use 's3' when FILESYSTEM_DRIVER=s3.
+    */
+    'media_disk' => env('FILESYSTEM_DRIVER') === 's3' ? 's3' : 'public',
+
+    /*
     |--------------------------------------------------------------------------
     | Filesystem Disks
     |--------------------------------------------------------------------------

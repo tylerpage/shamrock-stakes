@@ -12,6 +12,7 @@ use App\Models\PartyUser;
 use App\Models\PreVote;
 use App\Models\ResolutionProposal;
 use App\Models\ResolutionProposalPhoto;
+use App\Services\HouseMarketSeedService;
 use App\Services\PushNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -29,6 +30,48 @@ class PartyController extends Controller
         $parties = auth()->user()->parties()->with('admin')->withCount('markets')->get();
         $adminParties = auth()->user()->administeredParties()->withCount('markets')->get();
         return view('parties.index', compact('parties', 'adminParties'));
+    }
+
+    public function createMarketForm(Party $party)
+    {
+        $this->authorize('view', $party);
+        return view('parties.create-market', compact('party'));
+    }
+
+    public function storeMarket(Request $request, Party $party)
+    {
+        $this->authorize('view', $party);
+        $data = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+        ]);
+
+        $market = $party->markets()->create([
+            'title' => $data['title'],
+            'type' => Market::TYPE_YES_NO,
+            'status' => Market::STATUS_LIVE,
+            'resolution_type' => Market::RESOLUTION_VOTING,
+            'ends_at' => now()->addDays(1),
+            'voting_ends_at' => now()->addDays(1)->addHours(24),
+        ]);
+        $market->options()->createMany([
+            ['label' => 'Yes', 'sort_order' => 0],
+            ['label' => 'No', 'sort_order' => 1],
+        ]);
+
+        $seedService = app(HouseMarketSeedService::class);
+        $seedPerOption = (float) $party->default_balance * HouseMarketSeedService::SEED_PER_OPTION_FRACTION;
+        $house = $seedService->getOrCreateHouseUser();
+        $totalHouseBalance = round($seedPerOption * 2, 2); // Yes + No
+        $seedService->ensureHouseInParty($party, $house->id, $totalHouseBalance);
+        $market->load('options');
+        $seedService->seedMarketEqual($market, $seedPerOption);
+
+        $market->load(['options', 'preVotes', 'bets', 'resolution']);
+        broadcast(new MarketOddsUpdated($market))->toOthers();
+        broadcast(new PartyMarketsUpdated($party))->toOthers();
+        broadcast(new PartyLeaderboardUpdated($party))->toOthers();
+
+        return redirect()->route('parties.show', $party)->with('success', 'Market created and live. The house seeded 25% on Yes and 25% on No to keep odds stable.');
     }
 
     public function marketBets(Party $party, Market $market)
@@ -207,7 +250,7 @@ class PartyController extends Controller
             if ($request->hasFile('photos')) {
                 $dir = 'resolution-proposals/' . $proposal->id;
                 foreach ($request->file('photos') as $photo) {
-                    $path = $photo->store($dir, 'public');
+                    $path = $photo->store($dir, config('filesystems.media_disk'));
                     ResolutionProposalPhoto::create([
                         'resolution_proposal_id' => $proposal->id,
                         'path' => $path,

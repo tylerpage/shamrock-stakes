@@ -180,7 +180,7 @@ class PartyController extends Controller
             'image' => ['nullable', 'image', 'max:2048'],
         ]);
         $path = $request->hasFile('image')
-            ? $request->file('image')->store('market-options', 'public')
+            ? $request->file('image')->store('market-options', config('filesystems.media_disk'))
             : null;
         $market->options()->create([
             'label' => $data['label'],
@@ -202,7 +202,7 @@ class PartyController extends Controller
         ]);
         $path = $market_option->image_path;
         if ($request->hasFile('image')) {
-            $path = $request->file('image')->store('market-options', 'public');
+            $path = $request->file('image')->store('market-options', config('filesystems.media_disk'));
         }
         $market_option->update(['label' => $data['label'], 'image_path' => $path]);
         return back()->with('success', 'Option updated.');
