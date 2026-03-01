@@ -1,4 +1,4 @@
-const CACHE_NAME = 'shamrock-stakes-v1';
+const CACHE_NAME = 'shamrock-stakes-v2';
 const urlsToCache = ['/', '/css/app.css', '/js/app.js'];
 
 self.addEventListener('install', function (event) {
@@ -11,9 +11,32 @@ self.addEventListener('install', function (event) {
 });
 
 self.addEventListener('fetch', function (event) {
+  // Do not cache or intercept navigation requests (document / HTML). This avoids
+  // "response served by service worker has redirections" when the server redirects
+  // (e.g. / -> /parties or login).
+  if (event.request.mode === 'navigate') {
+    event.respondWith(fetch(event.request));
+    return;
+  }
   event.respondWith(
     caches.match(event.request).then(function (response) {
-      return response || fetch(event.request);
+      if (response && response.status === 200 && !response.redirected) {
+        return response;
+      }
+      return fetch(event.request).then(function (networkResponse) {
+        if (
+          networkResponse &&
+          networkResponse.status === 200 &&
+          networkResponse.type === 'basic' &&
+          !networkResponse.redirected
+        ) {
+          var responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then(function (cache) {
+            cache.put(event.request, responseToCache);
+          });
+        }
+        return networkResponse;
+      });
     })
   );
 });
