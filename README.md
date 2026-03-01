@@ -137,6 +137,14 @@ When you open the app on your phone via ngrok (or another tunnel), the built-in 
 
 - **Push notifications**: When a market is resolved, every user who placed a bet on that market receives a push notification (if they enabled push and VAPID is configured). Subscriptions are stored via `POST /push-subscription`. Generate VAPID keys with `php artisan web-push:vapid` and set `VAPID_SUBJECT`, `VAPID_PUBLIC_KEY`, and `VAPID_PRIVATE_KEY` in `.env`. Users must click “Enable push notifications” in the menu and accept the browser prompt; the front-end subscribes using the public key so the server can send.
 
+### Testing push notifications
+
+1. **Configure VAPID:** Run `php artisan web-push:vapid` and add the three env vars to `.env` (use a real `mailto:` for `VAPID_SUBJECT`).
+2. **Use HTTPS or localhost** – browsers only allow push on secure origins.
+3. **Subscribe:** Log in → click your name → **Enable push notifications** → Allow.
+4. **Send a test:** `php artisan push:test` (sends to first user with a subscription), or `php artisan push:test user@example.com` or `php artisan push:test 1`. Options: `--title="..."` and `--body="..."`.
+5. **Or trigger in app:** Resolve a market (users who bet get a push), or propose a resolution (party admin gets a push).
+
 ## Routes (auth required except where noted)
 
 - **Parties**: `GET /parties`, `GET /parties/{party}`, `POST /parties/{party}/markets/{market}/pre-vote`, `POST /parties/{party}/markets/{market}/bet`, `GET /parties/{party}/leaderboard`
