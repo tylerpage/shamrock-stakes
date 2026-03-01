@@ -136,7 +136,7 @@
                                     <summary class="small text-muted">Recent bets</summary>
                                     <ul class="list-unstyled small mt-1" data-recent-bets-list>
                                         @foreach($market->bets->take(10) as $bet)
-                                            <li>{{ $bet->user->name }}: ${{ number_format($bet->amount, 2) }} on {{ $bet->marketOption->label }} @ {{ number_format($bet->price * 100, 0) }}¢</li>
+                                            <li>{{ $bet->user->name }}: ${{ number_format($bet->amount * $bet->price, 2) }} on {{ $bet->marketOption->label }} @ {{ number_format($bet->price * 100, 0) }}¢</li>
                                         @endforeach
                                     </ul>
                                     <button type="button" class="btn btn-link btn-sm p-0 mt-1" data-view-all-bets data-market-id="{{ $market->id }}" data-market-title="{{ e($market->title) }}">View all bets</button>
@@ -391,10 +391,10 @@
             }
             var html = '<ul class="list-unstyled mb-0">';
             list.forEach(function (b) {
-              var amt = typeof b.amount === 'number' ? b.amount.toFixed(2) : b.amount;
-              var price = typeof b.price === 'number' ? Math.round(b.price * 100) : b.price;
+              var cost = (typeof b.amount === 'number' ? b.amount : parseFloat(b.amount) || 0) * (typeof b.price === 'number' ? b.price : parseFloat(b.price) || 0);
+              var price = typeof b.price === 'number' ? Math.round(b.price * 100) : (b.price ? Math.round(parseFloat(b.price) * 100) : 0);
               var time = b.created_at ? (new Date(b.created_at)).toLocaleString() : '';
-              html += '<li class="border-bottom py-2">' + (b.user_name || '—') + ': $' + amt + ' on <strong>' + (b.option_label || '—') + '</strong> @ ' + price + '¢' + (time ? ' <span class="text-muted">' + time + '</span>' : '') + '</li>';
+              html += '<li class="border-bottom py-2">' + (b.user_name || '—') + ': $' + cost.toFixed(2) + ' on <strong>' + (b.option_label || '—') + '</strong> @ ' + price + '¢' + (time ? ' <span class="text-muted">' + time + '</span>' : '') + '</li>';
             });
             html += '</ul>';
             listEl.innerHTML = html;
@@ -499,9 +499,9 @@
                 var marketTitle = (card.getAttribute('data-market-title') || '').replace(/"/g, '&quot;');
                 var html = '<details><summary class="small text-muted">Recent bets</summary><ul class="list-unstyled small mt-1" data-recent-bets-list>';
                 e.recent_bets.forEach(function (b) {
-                  var amt = typeof b.amount === 'number' ? b.amount.toFixed(2) : b.amount;
-                  var price = typeof b.price === 'number' ? Math.round(b.price * 100) : (b.price || 0);
-                  html += '<li>' + (b.user_name || '—') + ': $' + amt + ' on ' + (b.option_label || '—') + ' @ ' + price + '¢</li>';
+                  var cost = (typeof b.amount === 'number' ? b.amount : parseFloat(b.amount) || 0) * (typeof b.price === 'number' ? b.price : parseFloat(b.price) || 0);
+                  var price = typeof b.price === 'number' ? Math.round(b.price * 100) : (b.price ? Math.round(parseFloat(b.price) * 100) : 0);
+                  html += '<li>' + (b.user_name || '—') + ': $' + cost.toFixed(2) + ' on ' + (b.option_label || '—') + ' @ ' + price + '¢</li>';
                 });
                 html += '</ul><button type="button" class="btn btn-link btn-sm p-0 mt-1" data-view-all-bets data-market-id="' + (marketId || '') + '" data-market-title="' + (marketTitle.replace(/"/g, '&quot;') || '') + '">View all bets</button></details>';
                 container.innerHTML = html;
