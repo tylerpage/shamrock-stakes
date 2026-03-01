@@ -126,6 +126,31 @@ class Market extends Model
     }
 
     /**
+     * Odds (probability 0-1) from pre-votes only. Use when seeding the market at go-live.
+     * Returns equal 1/n per option if no pre-votes. Requires options + preVotes loaded.
+     */
+    public function getPreVoteOdds(): array
+    {
+        $optionIds = $this->options->pluck('id')->all();
+        if (empty($optionIds)) {
+            return [];
+        }
+        $total = 0;
+        $counts = array_fill_keys($optionIds, 0);
+        foreach ($this->preVotes as $v) {
+            if (isset($counts[$v->market_option_id])) {
+                $counts[$v->market_option_id]++;
+                $total++;
+            }
+        }
+        if ($total <= 0) {
+            $n = count($optionIds);
+            return array_combine($optionIds, array_fill(0, $n, 1 / $n));
+        }
+        return array_map(fn ($c) => $c / $total, $counts);
+    }
+
+    /**
      * For a resolved market, get a user's result: total staked, payout received, and win/loss.
      * Returns ['staked' => float, 'payout' => float, 'win_loss' => float] (win_loss = payout - staked).
      */

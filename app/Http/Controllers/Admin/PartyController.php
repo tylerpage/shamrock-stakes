@@ -6,6 +6,7 @@ use App\Events\MarketOddsUpdated;
 use App\Events\PartyLeaderboardUpdated;
 use App\Events\PartyMarketsUpdated;
 use App\Http\Controllers\Controller;
+use App\Models\Bet;
 use App\Models\Market;
 use App\Models\MarketOption;
 use App\Models\MarketResolution;
@@ -231,17 +232,96 @@ class PartyController extends Controller
         return back()->with('success', 'Pre-voting started. Participants can set initial odds.');
     }
 
+    /** Fraction of each user's balance used to seed markets at go-live (from pre-vote odds). */
+    private const SEED_BALANCE_FRACTION = 0.25;
+
     public function startLive(Party $party)
     {
         $this->authorize('update', $party);
+
+        $markets = $party->markets()
+            ->whereIn('status', [Market::STATUS_SETUP, Market::STATUS_PRE_VOTING])
+            ->with(['options', 'preVotes'])
+            ->get();
+
+        foreach ($markets as $market) {
+            $this->seedMarketFromPreVoteOdds($market);
+        }
+
         $party->markets()->whereIn('status', [Market::STATUS_SETUP, Market::STATUS_PRE_VOTING])
             ->update([
                 'status' => Market::STATUS_LIVE,
                 'ends_at' => now()->addDays(1),
                 'voting_ends_at' => now()->addDays(1)->addHours(24),
             ]);
+
+        foreach ($markets as $market) {
+            $market->refresh();
+            $market->load(['options', 'preVotes', 'bets', 'resolution']);
+            broadcast(new MarketOddsUpdated($market))->toOthers();
+        }
         broadcast(new PartyMarketsUpdated($party))->toOthers();
-        return back()->with('success', 'Markets are now live.');
+        broadcast(new PartyLeaderboardUpdated($party))->toOthers();
+
+        return back()->with('success', 'Markets are now live. Seed bets were placed from pre-vote odds (25% of each balance).');
+    }
+
+    /**
+     * Place seed bets for this market using pre-vote odds: each party member spends
+     * 25% of their balance, distributed across options by survey odds, to reduce initial swing.
+     */
+    private function seedMarketFromPreVoteOdds(Market $market): void
+    {
+        $odds = $market->getPreVoteOdds();
+        if (empty($odds)) {
+            return;
+        }
+
+        $party = $market->party;
+
+        DB::transaction(function () use ($market, $party, $odds) {
+            $members = PartyUser::where('party_id', $party->id)
+                ->lockForUpdate()
+                ->get();
+
+            foreach ($members as $partyUser) {
+                $balance = (float) $partyUser->balance;
+                $seedBudget = round($balance * self::SEED_BALANCE_FRACTION, 2);
+                if ($seedBudget < 0.01) {
+                    continue;
+                }
+
+                $totalCost = 0.0;
+                $betsToCreate = [];
+
+                foreach ($market->options as $option) {
+                    $optionId = $option->id;
+                    $prob = $odds[$optionId] ?? (1 / count($odds));
+                    $prob = max(0.01, min(1.0, (float) $prob));
+                    $cost = round($seedBudget * $prob, 2);
+                    if ($cost < 0.01) {
+                        continue;
+                    }
+                    $totalCost += $cost;
+                    $betsToCreate[] = [
+                        'market_id' => $market->id,
+                        'user_id' => $partyUser->user_id,
+                        'market_option_id' => $optionId,
+                        'amount' => $seedBudget,
+                        'price' => round($prob, 4),
+                    ];
+                }
+
+                if ($totalCost > $balance || $totalCost < 0.01) {
+                    continue;
+                }
+
+                $partyUser->decrement('balance', $totalCost);
+                foreach ($betsToCreate as $attrs) {
+                    Bet::create($attrs);
+                }
+            }
+        });
     }
 
     public function setOfficialOutcome(Request $request, Party $party, Market $market)
