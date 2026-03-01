@@ -5,8 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="theme-color" content="#0d3328">
-    <link rel="manifest" href="{{ asset('manifest.json') }}">
-    <link rel="apple-touch-icon" href="{{ asset('icons/icon-180.png') }}">
+    <link rel="manifest" href="{{ url('manifest.json') }}">
+    <link rel="apple-touch-icon" href="{{ url('icons/icon-180.png') }}">
+    <link rel="apple-touch-icon" sizes="120x120" href="{{ url('icons/icon-120.png') }}">
+    <link rel="apple-touch-icon" sizes="152x152" href="{{ url('icons/icon-152.png') }}">
+    <link rel="apple-touch-icon" sizes="167x167" href="{{ url('icons/icon-167.png') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url('icons/icon-180.png') }}">
     <title>@yield('title', 'Shamrock Stakes') — {{ config('app.name', 'Shamrock Stakes') }}</title>
     @php
         // Echo config so the browser connects to the right WebSocket (not 127.0.0.1 when deployed).

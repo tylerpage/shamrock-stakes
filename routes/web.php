@@ -18,6 +18,24 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+Route::get('/manifest.json', function () {
+    $base = rtrim(config('app.url'), '/');
+    return response()->json([
+        'name' => config('app.name', 'Shamrock Stakes'),
+        'short_name' => 'Shamrock Stakes',
+        'description' => 'Prediction markets for your party',
+        'start_url' => $base . '/',
+        'display' => 'standalone',
+        'background_color' => '#f5f0e6',
+        'theme_color' => '#0d3328',
+        'orientation' => 'portrait-primary',
+        'icons' => [
+            ['src' => $base . '/icons/icon-192.png', 'sizes' => '192x192', 'type' => 'image/png', 'purpose' => 'any maskable'],
+            ['src' => $base . '/icons/icon-512.png', 'sizes' => '512x512', 'type' => 'image/png', 'purpose' => 'any maskable'],
+        ],
+    ], 200, ['Content-Type' => 'application/json']);
+})->name('manifest');
+
 Auth::routes();
 
 Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
