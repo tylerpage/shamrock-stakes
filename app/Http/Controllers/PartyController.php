@@ -28,6 +28,9 @@ class PartyController extends Controller
     public function index()
     {
         $parties = auth()->user()->parties()->with('admin')->withCount('markets')->get();
+        if ($parties->count() === 1) {
+            return redirect()->route('parties.show', $parties->first());
+        }
         $adminParties = auth()->user()->administeredParties()->withCount('markets')->get();
         return view('parties.index', compact('parties', 'adminParties'));
     }

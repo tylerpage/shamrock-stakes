@@ -6,6 +6,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="theme-color" content="#0d3328">
     <link rel="manifest" href="{{ asset('manifest.json') }}">
+    <link rel="apple-touch-icon" href="{{ asset('icons/icon-180.png') }}">
     <title>@yield('title', 'Shamrock Stakes') — {{ config('app.name', 'Shamrock Stakes') }}</title>
     @php
         // Echo config so the browser connects to the right WebSocket (not 127.0.0.1 when deployed).

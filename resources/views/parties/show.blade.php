@@ -229,6 +229,10 @@
 <script>
 (function () {
   console.log('[Shamrock] Party page script loaded');
+  if (window.location.hash === '#resolved-markets') {
+    var resolvedTab = document.getElementById('resolved-tab');
+    if (resolvedTab) resolvedTab.click();
+  }
   var availableEl = document.getElementById('party-available');
   var portfolioEl = document.getElementById('party-portfolio');
   if (!availableEl) return;

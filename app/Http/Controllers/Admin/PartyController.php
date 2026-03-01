@@ -424,7 +424,7 @@ class PartyController extends Controller
             }
         });
 
-        // Notify users who bet on this market (after transaction so we don't hold the lock)
+        // Notify users who bet on this market with their outcome and link to resolved tab
         $market->load('resolution.winningOption', 'party');
         $winningLabel = $market->resolution && $market->resolution->winningOption
             ? $market->resolution->winningOption->label
@@ -432,13 +432,21 @@ class PartyController extends Controller
         $userIds = $market->bets()->pluck('user_id')->unique()->values()->all();
         if (!empty($userIds)) {
             $push = app(PushNotificationService::class);
-            $partyUrl = route('parties.show', $market->party);
-            $push->sendToUsers(
-                $userIds,
-                'Market resolved: ' . $market->title,
-                'Winner: ' . $winningLabel,
-                ['url' => $partyUrl]
-            );
+            $partyUrl = route('parties.show', $market->party) . '#resolved-markets';
+            $title = 'Market resolved: ' . $market->title;
+            foreach ($userIds as $userId) {
+                $result = $market->userResult($userId);
+                $winLoss = $result['win_loss'];
+                if ($winLoss > 0) {
+                    $outcome = 'You won $' . number_format($winLoss, 2);
+                } elseif ($winLoss < 0) {
+                    $outcome = 'You lost $' . number_format(abs($winLoss), 2);
+                } else {
+                    $outcome = 'You broke even';
+                }
+                $body = 'Winner: ' . $winningLabel . '. ' . $outcome . '.';
+                $push->sendToUsers([$userId], $title, $body, ['url' => $partyUrl]);
+            }
         }
 
         // Notify WebSocket listeners so they disable betting and show resolved status
